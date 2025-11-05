@@ -1,0 +1,848 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import axios from 'axios';
+import { toast } from 'react-toastify';
+
+const Chatbot = () => {
+  const { user } = useAuth();
+  const { isDarkMode } = useTheme();
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      text: `Hello ${user?.name || 'there'}! 👋 I'm your Advanced AI Health Assistant powered by intelligent medical knowledge. I can help you with:\n\n🏥 Symptom analysis & guidance\n💊 Medication information\n🍎 Nutrition & diet planning\n🏃 Exercise recommendations\n😴 Sleep optimization\n🧠 Mental health support\n🚨 Emergency assistance\n\nWhat can I help you with today?`,
+      sender: 'bot',
+      timestamp: new Date(),
+      type: 'welcome'
+    }
+  ]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [conversationMode, setConversationMode] = useState('general'); // general, symptom-checker, diet-planner
+  const messagesEndRef = useRef(null);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Enhanced health knowledge base with medical intelligence
+  const healthKnowledge = {
+    symptoms: {
+      keywords: ['headache', 'fever', 'cough', 'cold', 'pain', 'stomach', 'nausea', 'dizzy', 'tired', 'fatigue', 'sore throat', 'runny nose', 'body ache', 'chills', 'weakness'],
+      responses: [
+        "Based on your symptoms, I can provide some guidance. Could you tell me:\n• When did the symptoms start?\n• How severe is it (1-10 scale)?\n• Any other associated symptoms?\n• Have you taken any medication?\n\nThis will help me provide better advice.",
+        "I understand you're experiencing discomfort. Here's what I suggest:\n\n1. Monitor your symptoms carefully\n2. Rest and stay hydrated\n3. Track temperature if fever is present\n4. Avoid self-medication without guidance\n\n⚠️ Seek medical attention if symptoms worsen or persist beyond 48 hours.",
+        "Common symptom management tips:\n\n💧 Hydration: Drink 8-10 glasses of water daily\n😴 Rest: Get adequate sleep (7-9 hours)\n🌡️ Monitor: Keep track of symptom changes\n🍲 Nutrition: Eat light, nutritious meals\n\nIf symptoms are severe or you're concerned, consult a healthcare provider immediately."
+      ]
+    },
+    headache: {
+      keywords: ['headache', 'migraine', 'head pain', 'head hurt'],
+      responses: [
+        "For headache relief:\n\n✅ Immediate relief:\n• Rest in a quiet, dark room\n• Apply cold compress to forehead\n• Drink water (dehydration causes headaches)\n• Gentle neck massage\n\n⚠️ See a doctor if:\n• Severe sudden headache (thunderclap)\n• Vision changes or confusion\n• Headache after head injury\n• Persistent daily headaches",
+        "Headache types & management:\n\n🔹 Tension headache: Stress-related, tight band feeling\n   → Relaxation techniques, OTC pain relievers\n\n🔹 Migraine: Throbbing, one-sided, light sensitivity\n   → Prescribed medications, avoid triggers\n\n🔹 Cluster headache: Severe pain around eye\n   → Requires medical evaluation\n\n💡 Prevention: Regular sleep, stress management, stay hydrated"
+      ]
+    },
+    fever: {
+      keywords: ['fever', 'temperature', 'hot', 'burning'],
+      responses: [
+        "Fever management guide:\n\n🌡️ Normal: 98.6°F (37°C)\n⚠️ Fever: >100.4°F (38°C)\n🚨 High: >103°F (39.4°C)\n\nImmediate actions:\n1. Stay hydrated (water, ORS)\n2. Light clothing, room ventilation\n3. Lukewarm sponge bath\n4. Rest completely\n5. Monitor temperature every 4 hours\n\n💊 Medication (if needed):\n• Acetaminophen/Paracetamol\n• Ibuprofen (adults)\n\n⚠️ Seek immediate care if:\n• Fever >103°F persists\n• Difficulty breathing\n• Severe headache/stiff neck\n• Rash or confusion"
+      ]
+    },
+    nutrition: {
+      keywords: ['diet', 'food', 'nutrition', 'vitamins', 'healthy eating', 'weight', 'calories', 'meal', 'protein', 'carbs'],
+      responses: [
+        "🍎 Balanced Diet Essentials:\n\n✅ Daily Requirements:\n• Fruits: 2-3 servings\n• Vegetables: 3-4 servings\n• Whole grains: 6-8 servings\n• Protein: 2-3 servings (fish, chicken, legumes)\n• Dairy: 2-3 servings (low-fat options)\n• Healthy fats: Nuts, avocado, olive oil\n\n💧 Hydration: 8-10 glasses of water\n🚫 Limit: Sugar, processed foods, trans fats, excess salt",
+        "🥗 Nutrition by Goal:\n\n🔹 Weight Loss:\n• Calorie deficit (500 less/day)\n• High protein, high fiber\n• Small frequent meals\n• Avoid liquid calories\n\n🔹 Muscle Gain:\n• Protein: 1.6-2.2g/kg body weight\n• Calorie surplus (300-500 more/day)\n• Post-workout nutrition\n\n🔹 General Health:\n• Colorful plate (variety)\n• Portion control\n• Mindful eating\n• 80/20 rule (healthy/treats)",
+        "🍽️ Meal Planning Tips:\n\n Breakfast (25% calories):\n• Oats with fruits & nuts\n• Eggs with whole grain toast\n• Greek yogurt with berries\n\n Lunch (35% calories):\n• Lean protein + vegetables + grain\n• Salads with grilled chicken/fish\n\n Dinner (30% calories):\n• Light, early (3 hrs before sleep)\n• Soup + protein + veggies\n\n Snacks (10% calories):\n• Fruits, nuts, yogurt\n• Avoid processed snacks"
+      ]
+    },
+    exercise: {
+      keywords: ['exercise', 'workout', 'fitness', 'activity', 'gym', 'running', 'walking', 'cardio', 'strength', 'yoga'],
+      responses: [
+        "🏃 Complete Exercise Guide:\n\n📊 Weekly Requirements:\n• Cardio: 150 min moderate OR 75 min vigorous\n• Strength: 2-3 days (all major muscles)\n• Flexibility: Daily stretching\n• Rest: 1-2 days recovery\n\n🔥 Beginner's Plan:\nWeek 1-4:\n• 20 min walk (3x/week)\n• Bodyweight exercises (2x/week)\n• Stretching (daily)\n\nGradually increase duration & intensity",
+        "💪 Exercise by Goal:\n\n🔹 Weight Loss:\n• HIIT: 20-30 min, 3x/week\n• Steady cardio: 45 min, 4x/week\n• Strength: 2x/week (preserves muscle)\n• Daily: 10,000 steps\n\n🔹 Muscle Building:\n• Strength: 4-5x/week (split routine)\n• Compound exercises: Squats, deadlifts, bench\n• Progressive overload\n• Rest between workouts\n\n🔹 General Fitness:\n• Mix cardio + strength\n• Fun activities: Sports, dance, swimming\n• Consistency > intensity",
+        "🎯 Workout Tips:\n\n✅ Pre-Workout:\n• Light meal 2 hrs before\n• Warm-up: 5-10 min\n• Stay hydrated\n\n✅ During Workout:\n• Proper form > heavy weights\n• Controlled breathing\n• Listen to your body\n\n✅ Post-Workout:\n• Cool down & stretch\n• Protein within 30 min\n• Rehydrate\n• Track progress\n\n⚠️ Stop if: Severe pain, dizziness, chest discomfort"
+      ]
+    },
+    sleep: {
+      keywords: ['sleep', 'insomnia', 'tired', 'rest', 'bedtime', 'sleeping', 'cant sleep', 'awake'],
+      responses: [
+        "😴 Sleep Optimization Guide:\n\n⏰ Recommended Sleep:\n• Adults: 7-9 hours\n• Teenagers: 8-10 hours\n• Children: 9-12 hours\n\n🌙 Sleep Hygiene:\n1. Consistent schedule (same time daily)\n2. Dark, cool room (60-67°F)\n3. No screens 1 hour before bed\n4. Comfortable mattress & pillow\n5. No caffeine after 2 PM\n6. Exercise, but not before bed\n7. Light dinner 3 hours before sleep",
+        "💤 Sleep Improvement Protocol:\n\n🌆 Evening Routine (2 hrs before bed):\n• Dim lights, reduce stimulation\n• Warm shower/bath\n• Reading, meditation, gentle stretching\n• Herbal tea (chamomile, lavender)\n• Write tomorrow's to-do list\n\n🚫 Avoid:\n• Heavy meals\n• Alcohol (disrupts sleep cycles)\n• Intense exercise\n• Work/stressful activities\n• Daytime naps >20 min\n\n⚠️ Consult doctor if:\n• Chronic insomnia (>3 weeks)\n• Loud snoring (sleep apnea?)\n• Excessive daytime sleepiness"
+      ]
+    },
+    mental_health: {
+      keywords: ['stress', 'anxiety', 'depression', 'mental health', 'mood', 'worried', 'sad', 'panic', 'overwhelmed'],
+      responses: [
+        "🧠 Mental Health Support:\n\nI see you're going through a tough time. Mental health matters just as much as physical health.\n\n💚 Immediate Relief:\n• Deep breathing: 4-7-8 technique\n• Grounding: 5-4-3-2-1 method\n• Call trusted friend/family\n• Take a walk in nature\n• Listen to calming music\n\n📞 Professional Help:\n• Therapist/Counselor\n• Psychiatrist (if needed)\n• Support groups\n• Crisis hotline: 988 (US)\n\nRemember: It's okay to not be okay. Seeking help is strength, not weakness.",
+        "🌟 Stress Management Techniques:\n\n1️⃣ Mindfulness & Meditation:\n• 10 min daily practice\n• Focus on breathing\n• Body scan relaxation\n\n2️⃣ Physical Activity:\n• Releases endorphins\n• Reduces cortisol\n• Improves mood\n\n3️⃣ Social Connection:\n• Talk to loved ones\n• Join communities\n• Volunteer work\n\n4️⃣ Time Management:\n• Prioritize tasks\n• Say no when needed\n• Take regular breaks\n\n5️⃣ Self-Care:\n• Adequate sleep\n• Healthy diet\n• Hobbies & interests\n• Set boundaries",
+        "⚠️ When to Seek Immediate Help:\n\n🚨 Call emergency services if experiencing:\n• Thoughts of self-harm or suicide\n• Plans to hurt self or others\n• Severe panic attacks\n• Complete inability to function\n• Psychotic symptoms (hallucinations)\n\n📲 Crisis Resources:\n• National Suicide Prevention: 988\n• Crisis Text Line: Text HOME to 741741\n• SAMHSA Helpline: 1-800-662-4357\n\nYou're not alone. Help is available 24/7."
+      ]
+    },
+    medications: {
+      keywords: ['medicine', 'medication', 'pills', 'dosage', 'side effects', 'prescription', 'drug', 'tablet'],
+      responses: [
+        "💊 Medication Safety Guide:\n\n✅ Essential Rules:\n1. Take as prescribed (time, dose, duration)\n2. Don't skip or double doses\n3. Never share prescriptions\n4. Check expiration dates\n5. Store properly (cool, dry place)\n6. Keep medication list updated\n7. Inform all doctors of all meds\n\n⚠️ Report to Doctor:\n• New side effects\n• Allergic reactions\n• Medication not working\n• Difficulty affording meds\n\n🚫 Never combine:\n• Alcohol with most medications\n• Multiple drugs without consulting doctor",
+        "📋 Medication Management Tips:\n\n🕐 Timing:\n• Set daily alarms/reminders\n• Use pill organizers\n• Link to daily routines (breakfast, bedtime)\n\n📱 Apps:\n• Medisafe\n• MyTherapy\n• CareZone\n\n💡 Understanding Labels:\n• Take with food: Prevents stomach upset\n• Empty stomach: 1 hr before or 2 hrs after meals\n• Do not crush: May alter effectiveness\n\n🔍 Side Effects:\n• Common: Usually minor, temporary\n• Serious: Difficulty breathing, severe rash, chest pain\n\n📞 Always consult pharmacist/doctor for clarification"
+      ]
+    },
+    prevention: {
+      keywords: ['prevent', 'vaccination', 'checkup', 'screening', 'health check', 'immunization'],
+      responses: [
+        "🛡️ Preventive Healthcare Checklist:\n\n📅 Annual Screenings:\n• Blood pressure\n• Cholesterol levels\n• Blood sugar (diabetes)\n• BMI & weight\n• Vision & dental\n\n💉 Vaccinations:\n• Flu shot (annual)\n• COVID-19 (as recommended)\n• Tdap (every 10 years)\n• Age-specific vaccines\n\n🔍 Age-Specific Screening:\n Women:\n• Mammogram: 40+ (annual)\n• Pap smear: 21-65 (3-5 years)\n• Bone density: 65+ (biennial)\n\n Men:\n• Prostate: 50+ (annual)\n• Colon cancer: 45+ (as advised)\n\n🏥 Don't skip routine checkups!"
+      ]
+    },
+    emergency: {
+      keywords: ['emergency', 'urgent', 'severe', 'serious', 'critical', 'help'],
+      responses: [
+        "🚨 EMERGENCY PROTOCOLS:\n\nCALL 911 IMMEDIATELY if experiencing:\n\n❤️ Heart Attack Signs:\n• Chest pain/pressure\n• Left arm pain\n• Shortness of breath\n• Nausea, cold sweat\n\n🧠 Stroke Signs (FAST):\n• Face drooping\n• Arm weakness\n• Speech difficulty\n• Time to call 911\n\n⚠️ Other Emergencies:\n• Severe bleeding\n• Difficulty breathing\n• Severe allergic reaction\n• Loss of consciousness\n• Severe burns\n• Poisoning\n• Major trauma\n\n📞 Don't wait - call immediately!\nWhile waiting: Stay calm, don't move patient unless necessary, follow 911 operator instructions."
+      ]
+    }
+  };
+
+  // Advanced response generator with context awareness
+  const generateResponse = (userMessage) => {
+    const message = userMessage.toLowerCase();
+    
+    // Greeting detection
+    if (/^(hello|hi|hey|good morning|good afternoon|good evening)\b/i.test(message)) {
+      const greetings = [
+        "Hello! 👋 How can I assist you with your health today?",
+        "Hi there! 😊 I'm here to help. What health topic would you like to discuss?",
+        "Hey! Welcome back! What can I help you with today?"
+      ];
+      return greetings[Math.floor(Math.random() * greetings.length)];
+    }
+
+    // Thanks/goodbye detection
+    if (message.includes('thank') || message.includes('thanks')) {
+      return "You're very welcome! 😊 Remember, I provide general health information only. For personalized medical advice, always consult with healthcare professionals.\n\nFeel free to ask me anything else about your health!";
+    }
+
+    if (message.includes('bye') || message.includes('goodbye')) {
+      return "Take care and stay healthy! 👋 Feel free to return anytime you need health information or guidance. Remember to:\n\n✅ Stay hydrated\n✅ Get adequate sleep\n✅ Exercise regularly\n✅ Eat nutritious meals\n\nGoodbye for now!";
+    }
+
+    // Emergency keywords - HIGHEST PRIORITY
+    const criticalKeywords = ['suicide', 'kill myself', 'end my life', 'hurt myself', 'self harm'];
+    if (criticalKeywords.some(keyword => message.includes(keyword))) {
+      return "🚨 IMMEDIATE HELP NEEDED 🚨\n\nI'm very concerned about what you've shared. Please reach out for help RIGHT NOW:\n\n📞 National Suicide Prevention Lifeline:\n• Call/Text 988 (24/7, free, confidential)\n• Or call 1-800-273-8255\n\n📱 Crisis Text Line:\n• Text HOME to 741741\n\n🏥 Emergency Services:\n• Call 911 or go to nearest ER\n\nYou are not alone. Your life matters. People care about you and want to help. These resources are available 24/7.";
+    }
+
+    const emergencyKeywords = ['emergency', 'urgent', 'severe pain', 'chest pain', 'cant breathe', 'bleeding', 'unconscious', 'stroke', 'heart attack'];
+    if (emergencyKeywords.some(keyword => message.includes(keyword))) {
+      return "🚨 THIS SOUNDS LIKE A MEDICAL EMERGENCY! 🚨\n\n📞 CALL 911 IMMEDIATELY or go to the nearest emergency room!\n\nDo NOT wait for online advice in emergency situations. Emergency services can provide immediate, life-saving assistance.\n\nWhile waiting for help:\n• Stay calm\n• Don't move if injured\n• Note symptoms and time started\n• Have someone stay with you\n\nYour safety is the top priority!";
+    }
+
+    // Multi-keyword matching with priority scoring
+    let bestMatch = { category: null, score: 0 };
+    
+    for (const [category, data] of Object.entries(healthKnowledge)) {
+      const matchCount = data.keywords.filter(keyword => message.includes(keyword)).length;
+      if (matchCount > bestMatch.score) {
+        bestMatch = { category, score: matchCount };
+      }
+    }
+
+    if (bestMatch.category && bestMatch.score > 0) {
+      const responses = healthKnowledge[bestMatch.category].responses;
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    // Context-aware default responses
+    const defaultResponses = [
+      "I'd be happy to help! 😊 I specialize in:\n\n🏥 Health Symptoms & Guidance\n💊 Medication Information\n🍎 Nutrition & Diet Planning\n🏃 Exercise & Fitness\n😴 Sleep Optimization\n🧠 Mental Health Support\n🛡️ Preventive Care\n\nCould you tell me more about what specific health topic you'd like to discuss?",
+      "I'm here to assist with general health information! I can provide guidance on symptoms, nutrition, exercise, sleep, mental health, and preventive care.\n\nWhat specific health concern or question do you have? The more details you provide, the better I can help!",
+      "I want to make sure I give you the most helpful information. Could you please clarify:\n\n• What specific health topic you're interested in?\n• Are you experiencing any symptoms?\n• Is this for general wellness or a specific concern?\n\nFeel free to use the quick action buttons below for common topics!"
+    ];
+
+    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+  };
+
+  const sendMessage = async () => {
+    if (!inputMessage.trim()) return;
+
+    const userMessage = {
+      id: Date.now(),
+      text: inputMessage,
+      sender: 'user',
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    setIsTyping(true);
+    setShowSuggestions(false);
+
+    // Simulate AI processing time
+    setTimeout(() => {
+      const botResponse = {
+        id: Date.now() + 1,
+        text: generateResponse(inputMessage),
+        sender: 'bot',
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, botResponse]);
+      setIsTyping(false);
+    }, 1500 + Math.random() * 1500); // Random delay 1.5-3 seconds
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  // Enhanced quick actions with categories
+  const quickActions = [
+    { icon: '🤕', text: 'Symptom Checker', prompt: 'I have some symptoms I want to discuss' },
+    { icon: '🍎', text: 'Diet Plan', prompt: 'I need help with nutrition and diet planning' },
+    { icon: '💊', text: 'Medication Info', prompt: 'I have questions about medications' },
+    { icon: '🏃', text: 'Exercise Guide', prompt: 'What exercise routine do you recommend?' },
+    { icon: '😴', text: 'Sleep Better', prompt: 'How can I improve my sleep quality?' },
+    { icon: '🧠', text: 'Stress Relief', prompt: 'I need help managing stress and anxiety' },
+    { icon: '🛡️', text: 'Preventive Care', prompt: 'What preventive health measures should I take?' },
+    { icon: '🚨', text: 'Emergency Info', prompt: 'When should I seek emergency medical care?' }
+  ];
+
+  const handleQuickAction = (prompt) => {
+    setInputMessage(prompt);
+    setTimeout(() => sendMessage(), 100);
+  };
+
+  const clearChat = () => {
+    setMessages([
+      {
+        id: 1,
+        text: `Hello again ${user?.name}! 👋 Chat cleared. How can I help you today?`,
+        sender: 'bot',
+        timestamp: new Date(),
+        type: 'welcome'
+      }
+    ]);
+    setShowSuggestions(true);
+    toast.success('Chat history cleared');
+  };
+
+  const exportChat = () => {
+    const chatText = messages.map(msg => 
+      `[${msg.timestamp.toLocaleString()}] ${msg.sender === 'user' ? 'You' : 'AI Assistant'}: ${msg.text}`
+    ).join('\n\n');
+
+    const blob = new Blob([chatText], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `health-chat-${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    toast.success('Chat exported successfully!');
+  };
+
+  return (
+    <div className={`chatbot-page ${isDarkMode ? 'dark-mode' : ''}`}>
+      <div className="chatbot-hero">
+        <div className="container">
+          <h1 className="chatbot-title">
+            <span className="gradient-text">🤖 Advanced AI Health Assistant</span>
+          </h1>
+          <p className="chatbot-subtitle">
+            Powered by intelligent medical knowledge • Available 24/7 • Instant Responses
+          </p>
+          <div className="chatbot-features">
+            <span className="feature-badge">💬 Natural Conversation</span>
+            <span className="feature-badge">🔒 100% Private</span>
+            <span className="feature-badge">⚡ Instant Answers</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="container">
+        <div className="chatbot-container">
+          {/* Chat Header */}
+          <div className="chat-header">
+            <div className="bot-info">
+              <div className="bot-avatar">🤖</div>
+              <div>
+                <h3>AI Health Assistant</h3>
+                <span className="status-indicator">
+                  <span className="status-dot"></span> Online & Ready
+                </span>
+              </div>
+            </div>
+            <div className="chat-actions">
+              <button onClick={exportChat} className="icon-btn" title="Export Chat">
+                📥
+              </button>
+              <button onClick={clearChat} className="icon-btn" title="Clear Chat">
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          {/* Chat Messages */}
+          <div className="chat-messages">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`message-wrapper ${message.sender === 'user' ? 'user-wrapper' : 'bot-wrapper'}`}
+              >
+                <div className="message-avatar">
+                  {message.sender === 'user' ? (
+                    <div className="user-avatar">{user?.name?.charAt(0).toUpperCase() || '👤'}</div>
+                  ) : (
+                    <div className="bot-avatar-sm">🤖</div>
+                  )}
+                </div>
+                <div className="message-bubble">
+                  <div className="message-text">{message.text}</div>
+                  <div className="message-time">
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {isTyping && (
+              <div className="message-wrapper bot-wrapper">
+                <div className="message-avatar">
+                  <div className="bot-avatar-sm">🤖</div>
+                </div>
+                <div className="message-bubble">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <div className="typing-text">AI is thinking...</div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick Actions */}
+          {showSuggestions && (
+            <div className="quick-actions-section">
+              <p className="quick-title">🎯 Quick Actions - Choose a topic:</p>
+              <div className="quick-actions-grid">
+                {quickActions.map((action, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleQuickAction(action.prompt)}
+                    className="quick-action-btn"
+                  >
+                    <span className="action-icon">{action.icon}</span>
+                    <span className="action-text">{action.text}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chat Input */}
+          <div className="chat-input-section">
+            <div className="input-container">
+              <textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your health question here... (Press Enter to send)"
+                className="message-input"
+                rows="2"
+                maxLength="500"
+              />
+              <div className="input-footer">
+                <span className="char-count">{inputMessage.length}/500</span>
+                <button
+                  onClick={sendMessage}
+                  disabled={!inputMessage.trim() || isTyping}
+                  className="send-btn"
+                >
+                  {isTyping ? '⏳ Processing...' : '📤 Send Message'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="disclaimer-box">
+            <div className="disclaimer-icon">⚠️</div>
+            <div className="disclaimer-content">
+              <strong>Important Medical Disclaimer:</strong> This AI assistant provides general health information and should not replace professional medical advice, diagnosis, or treatment. Always consult qualified healthcare providers for medical concerns. In emergencies, call 911 immediately.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      text: `Hello ${user?.name || 'there'}! I'm your AI Health Assistant. I can help answer general health questions, provide wellness tips, and offer basic medical guidance. How can I help you today?`,
+      sender: 'bot',
+      timestamp: new Date()
+    }
+  ]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Health knowledge base with responses
+  const healthKnowledge = {
+    symptoms: {
+      keywords: ['headache', 'fever', 'cough', 'cold', 'pain', 'stomach', 'nausea', 'dizzy', 'tired', 'fatigue'],
+      responses: [
+        "I understand you're experiencing symptoms. While I can provide general information, it's important to consult with a healthcare professional for proper diagnosis and treatment.",
+        "For common symptoms like headaches or mild fever, rest and hydration often help. However, if symptoms persist or worsen, please see a doctor.",
+        "If you're experiencing severe symptoms or emergency signs (chest pain, difficulty breathing, severe bleeding), please seek immediate medical attention or call emergency services."
+      ]
+    },
+    nutrition: {
+      keywords: ['diet', 'food', 'nutrition', 'vitamins', 'healthy eating', 'weight', 'calories'],
+      responses: [
+        "A balanced diet includes fruits, vegetables, whole grains, lean proteins, and healthy fats. Aim for 5 servings of fruits and vegetables daily.",
+        "Stay hydrated by drinking 8-10 glasses of water daily. Limit processed foods, sugar, and excessive salt.",
+        "For personalized nutrition advice, consider consulting with a registered dietitian who can create a plan tailored to your needs."
+      ]
+    },
+    exercise: {
+      keywords: ['exercise', 'workout', 'fitness', 'activity', 'gym', 'running', 'walking'],
+      responses: [
+        "Aim for at least 150 minutes of moderate aerobic activity or 75 minutes of vigorous activity weekly, plus muscle-strengthening exercises twice a week.",
+        "Start slowly if you're new to exercise. Even a 10-minute walk daily can provide health benefits.",
+        "Choose activities you enjoy - dancing, swimming, hiking, or playing sports can all be great forms of exercise!"
+      ]
+    },
+    sleep: {
+      keywords: ['sleep', 'insomnia', 'tired', 'rest', 'bedtime', 'sleeping'],
+      responses: [
+        "Adults need 7-9 hours of quality sleep nightly. Maintain a consistent sleep schedule by going to bed and waking up at the same time daily.",
+        "Create a relaxing bedtime routine: limit screen time, keep your bedroom cool and dark, and avoid caffeine late in the day.",
+        "If you have persistent sleep problems, consider speaking with a healthcare provider about possible sleep disorders."
+      ]
+    },
+    mental_health: {
+      keywords: ['stress', 'anxiety', 'depression', 'mental health', 'mood', 'worried', 'sad'],
+      responses: [
+        "Mental health is just as important as physical health. Practice stress management through deep breathing, meditation, or yoga.",
+        "Stay connected with friends and family, engage in activities you enjoy, and don't hesitate to seek professional help if needed.",
+        "If you're experiencing persistent sadness, anxiety, or thoughts of self-harm, please reach out to a mental health professional or crisis helpline immediately."
+      ]
+    },
+    medications: {
+      keywords: ['medicine', 'medication', 'pills', 'dosage', 'side effects', 'prescription'],
+      responses: [
+        "Always take medications as prescribed by your healthcare provider. Don't skip doses or stop taking medication without consulting your doctor.",
+        "Keep an updated list of all medications you take, including over-the-counter drugs and supplements.",
+        "If you experience side effects, contact your healthcare provider. Never share prescription medications with others."
+      ]
+    },
+    prevention: {
+      keywords: ['prevent', 'vaccination', 'checkup', 'screening', 'health check'],
+      responses: [
+        "Regular health screenings and preventive care are crucial. Follow your doctor's recommendations for checkups, vaccinations, and screenings.",
+        "Practice good hygiene: wash hands frequently, cover coughs and sneezes, and avoid close contact with sick individuals.",
+        "Maintain a healthy lifestyle with good nutrition, regular exercise, adequate sleep, and stress management."
+      ]
+    }
+  };
+
+  const generateResponse = (userMessage) => {
+    const message = userMessage.toLowerCase();
+    
+    // Check for greetings
+    if (message.includes('hello') || message.includes('hi') || message.includes('hey')) {
+      return "Hello! I'm here to help with your health questions. What would you like to know about?";
+    }
+
+    // Check for thanks
+    if (message.includes('thank') || message.includes('thanks')) {
+      return "You're welcome! Remember, I provide general health information only. Always consult healthcare professionals for medical advice. Is there anything else I can help you with?";
+    }
+
+    // Emergency keywords
+    const emergencyKeywords = ['emergency', 'urgent', 'severe pain', 'chest pain', 'can\'t breathe', 'bleeding', 'unconscious'];
+    if (emergencyKeywords.some(keyword => message.includes(keyword))) {
+      return "🚨 This sounds like a medical emergency. Please call emergency services (911) or go to the nearest emergency room immediately. Don't wait for online advice in emergency situations.";
+    }
+
+    // Find matching category
+    for (const [, data] of Object.entries(healthKnowledge)) {
+      if (data.keywords.some(keyword => message.includes(keyword))) {
+        const randomResponse = data.responses[Math.floor(Math.random() * data.responses.length)];
+        return randomResponse;
+      }
+    }
+
+    // Default response for unmatched queries
+    return "I can help with general health topics like nutrition, exercise, sleep, stress management, and wellness tips. Could you please be more specific about what health topic you'd like to discuss?";
+  };
+
+  const sendMessage = async () => {
+    if (!inputMessage.trim()) return;
+
+    const userMessage = {
+      id: Date.now(),
+      text: inputMessage,
+      sender: 'user',
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    setIsTyping(true);
+
+    // Simulate typing delay
+    setTimeout(() => {
+      const botResponse = {
+        id: Date.now() + 1,
+        text: generateResponse(inputMessage),
+        sender: 'bot',
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, botResponse]);
+      setIsTyping(false);
+    }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const quickQuestions = [
+    "How can I improve my sleep?",
+    "What's a healthy diet?",
+    "How much exercise do I need?",
+    "How to manage stress?",
+    "What are preventive health measures?"
+  ];
+
+  const handleQuickQuestion = (question) => {
+    setInputMessage(question);
+  };
+
+  return (
+    <div className="page">
+      <div className="container">
+        <h1>🤖 AI Health Assistant</h1>
+        <p>Get instant answers to your general health questions</p>
+
+        <div className="chatbot-container">
+          <div className="chat-messages">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`message ${message.sender === 'user' ? 'user-message' : 'bot-message'}`}
+              >
+                <div className="message-content">
+                  <div className="message-text">{message.text}</div>
+                  <div className="message-time">
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                <div className="message-avatar">
+                  {message.sender === 'user' ? '👤' : '🤖'}
+                </div>
+              </div>
+            ))}
+            
+            {isTyping && (
+              <div className="message bot-message">
+                <div className="message-content">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+                <div className="message-avatar">🤖</div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="quick-questions">
+            <p>Quick questions:</p>
+            <div className="quick-buttons">
+              {quickQuestions.map((question, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleQuickQuestion(question)}
+                  className="quick-btn"
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="chat-input">
+            <textarea
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Ask me about health, nutrition, exercise, sleep, or wellness..."
+              className="message-input"
+              rows="3"
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!inputMessage.trim() || isTyping}
+              className="send-button"
+            >
+              Send
+            </button>
+          </div>
+
+          <div className="disclaimer">
+            <p>
+              ⚠️ <strong>Medical Disclaimer:</strong> This AI assistant provides general health information only and should not replace professional medical advice, diagnosis, or treatment. Always consult qualified healthcare providers for medical concerns.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        .chatbot-container {
+          max-width: 800px;
+          margin: 2rem auto;
+          border: 1px solid var(--border-color);
+          border-radius: 1rem;
+          overflow: hidden;
+          background-color: var(--background-color);
+          box-shadow: var(--shadow-lg);
+        }
+
+        .chat-messages {
+          height: 500px;
+          overflow-y: auto;
+          padding: 1rem;
+          background-color: var(--light-bg);
+        }
+
+        .message {
+          display: flex;
+          margin-bottom: 1rem;
+          align-items: flex-end;
+          gap: 0.75rem;
+        }
+
+        .user-message {
+          flex-direction: row-reverse;
+        }
+
+        .message-content {
+          max-width: 70%;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .message-text {
+          padding: 1rem;
+          border-radius: 1rem;
+          word-wrap: break-word;
+          line-height: 1.5;
+        }
+
+        .user-message .message-text {
+          background-color: var(--primary-color);
+          color: white;
+          border-bottom-right-radius: 0.25rem;
+        }
+
+        .bot-message .message-text {
+          background-color: var(--background-color);
+          color: var(--text-color);
+          border: 1px solid var(--border-color);
+          border-bottom-left-radius: 0.25rem;
+        }
+
+        .message-time {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          margin-top: 0.25rem;
+          padding: 0 0.5rem;
+        }
+
+        .user-message .message-time {
+          text-align: right;
+        }
+
+        .message-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background-color: var(--primary-color);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.25rem;
+          flex-shrink: 0;
+        }
+
+        .typing-indicator {
+          display: flex;
+          gap: 0.25rem;
+          padding: 1rem;
+          align-items: center;
+        }
+
+        .typing-indicator span {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background-color: var(--text-secondary);
+          animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+          0%, 60%, 100% {
+            transform: translateY(0);
+          }
+          30% {
+            transform: translateY(-10px);
+          }
+        }
+
+        .quick-questions {
+          padding: 1rem;
+          border-top: 1px solid var(--border-color);
+          background-color: var(--background-color);
+        }
+
+        .quick-questions p {
+          margin: 0 0 0.75rem 0;
+          font-weight: 500;
+          color: var(--text-color);
+        }
+
+        .quick-buttons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .quick-btn {
+          padding: 0.5rem 1rem;
+          background-color: var(--light-bg);
+          border: 1px solid var(--border-color);
+          border-radius: 1rem;
+          color: var(--text-color);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-size: 0.875rem;
+        }
+
+        .quick-btn:hover {
+          background-color: var(--primary-color);
+          color: white;
+          border-color: var(--primary-color);
+        }
+
+        .chat-input {
+          display: flex;
+          gap: 0.75rem;
+          padding: 1rem;
+          background-color: var(--background-color);
+          border-top: 1px solid var(--border-color);
+        }
+
+        .message-input {
+          flex: 1;
+          padding: 0.75rem;
+          border: 1px solid var(--border-color);
+          border-radius: 0.5rem;
+          background-color: var(--background-color);
+          color: var(--text-color);
+          resize: none;
+          font-family: inherit;
+        }
+
+        .message-input:focus {
+          outline: none;
+          border-color: var(--primary-color);
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .send-button {
+          padding: 0.75rem 1.5rem;
+          background-color: var(--primary-color);
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-weight: 500;
+          transition: background-color 0.3s ease;
+        }
+
+        .send-button:hover:not(:disabled) {
+          background-color: var(--primary-dark);
+        }
+
+        .send-button:disabled {
+          background-color: var(--text-secondary);
+          cursor: not-allowed;
+        }
+
+        .disclaimer {
+          padding: 1rem;
+          background-color: var(--warning-bg, #fef3cd);
+          border-top: 1px solid var(--border-color);
+          font-size: 0.875rem;
+        }
+
+        .disclaimer p {
+          margin: 0;
+          color: var(--warning-text, #856404);
+        }
+
+        @media (max-width: 768px) {
+          .message-content {
+            max-width: 85%;
+          }
+
+          .quick-buttons {
+            flex-direction: column;
+          }
+
+          .chat-input {
+            flex-direction: column;
+          }
+
+          .send-button {
+            align-self: flex-end;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default Chatbot;
